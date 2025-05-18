@@ -54,4 +54,3 @@ private:
 
 } // namespace UI
 } // namespace MusicSalon
-```
