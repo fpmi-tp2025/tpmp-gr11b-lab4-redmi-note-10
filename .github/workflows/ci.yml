@@ -59,13 +59,4 @@ jobs:
         file: ./build/coverage.info
         flags: unittests
         name: codecov-umbrella
-        
-    # Используем конкретную версию с SHA
-    - name: Archive production artifacts
-      uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
-      with:
-        name: music-salon
-        path: |
-          bin/music_salon
-          bin/music_salon_db.sql
-          bin/resources/
+
