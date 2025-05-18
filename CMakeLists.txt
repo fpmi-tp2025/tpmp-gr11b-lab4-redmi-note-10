@@ -72,7 +72,7 @@ target_link_libraries(music_salon PRIVATE
 )
 
 # Копирование SQL скрипта и ресурсов в бинарную директорию
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/music_salon_db.sql ${BIN_DIR}/music_salon_db.sql COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/music_salon_db.db ${BIN_DIR}/music_salon_db.db COPYONLY)
 file(GLOB RESOURCE_FILES ${RESOURCES_DIR}/*)
 foreach(RESOURCE_FILE ${RESOURCE_FILES})
     get_filename_component(FILENAME ${RESOURCE_FILE} NAME)
