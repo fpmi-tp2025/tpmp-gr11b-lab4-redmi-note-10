@@ -24,7 +24,7 @@ public:
     static std::string getDateInput(const std::string& prompt);
     
     // Выбор элемента из списка
-    static int getChoice(const std::string& prompt, const std::vector& options);
+    static int getChoice(const std::string& prompt, const std::vector<std::string>& options);
     
     // Запрос подтверждения действия (да/нет)
     static bool confirm(const std::string& prompt);
