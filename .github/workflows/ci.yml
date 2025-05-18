@@ -1,15 +1,21 @@
 name: CI/CD
-
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  packages: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3  # Обновлено с v2 до v3
 
