@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3  # Обновлено с v2 до v3
 
     - name: Install dependencies
       run: |
@@ -48,14 +48,14 @@ jobs:
         lcov --list coverage.info
 
     - name: Upload coverage report
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3  # Обновлено с v1 до v3
       with:
         file: ./build/coverage.info
         flags: unittests
         name: codecov-umbrella
 
     - name: Archive production artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3  # Обновлено с v2 до v3
       with:
         name: music-salon
         path: |
