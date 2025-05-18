@@ -1,7 +1,7 @@
 #pragma once
 
-#include 
-#include 
+#include <string>
+#include <vector>
 
 namespace MusicSalon {
 namespace Utils {
