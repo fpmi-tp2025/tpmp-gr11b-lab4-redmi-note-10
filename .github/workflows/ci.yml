@@ -17,8 +17,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3  # Обновлено с v2 до v3
-
+    - uses: actions/checkout@v3
+    
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -28,23 +28,23 @@ jobs:
         git clone https://github.com/Microsoft/vcpkg.git
         ./vcpkg/bootstrap-vcpkg.sh
         ./vcpkg/vcpkg install nlohmann-json
-
+        
     - name: Configure CMake
       run: |
         mkdir -p build
         cd build
         cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_CODE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
-
+        
     - name: Build
       run: |
         cd build
         make
-
+        
     - name: Test
       run: |
         cd build
         ctest -V
-
+        
     - name: Generate code coverage report
       run: |
         sudo apt-get install -y lcov
@@ -52,16 +52,17 @@ jobs:
         lcov --capture --directory . --output-file coverage.info
         lcov --remove coverage.info '/usr/*' --output-file coverage.info
         lcov --list coverage.info
-
+        
     - name: Upload coverage report
-      uses: codecov/codecov-action@v3  # Обновлено с v1 до v3
+      uses: codecov/codecov-action@v3
       with:
         file: ./build/coverage.info
         flags: unittests
         name: codecov-umbrella
-
+        
+    # Используем конкретную версию с SHA
     - name: Archive production artifacts
-      uses: actions/upload-artifact@v3  # Обновлено с v2 до v3
+      uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
       with:
         name: music-salon
         path: |
