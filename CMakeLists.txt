@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.14)
 project(MusicSalon VERSION 1.0.0 LANGUAGES CXX)
 
@@ -45,19 +44,12 @@ include_directories(
     ${OPENSSL_INCLUDE_DIR}
 )
 
-# Define source files
+# Define actual source files based on existing files
 set(SOURCES
     src/auth/Authentication.cpp
     src/database/Database.cpp
     src/models/User.cpp
-    src/models/CompactDisc.cpp
-    src/models/Author.cpp
-    src/models/Performer.cpp
-    src/models/MusicalWork.cpp
-    src/models/StockOperation.cpp
     src/ui/ConsoleUI.cpp
-    src/utils/DateUtils.cpp
-    src/utils/InputUtils.cpp
     src/main.cpp
 )
 
@@ -95,7 +87,12 @@ else()
 endif()
 
 # Create a library from source files for tests to link against
-add_library(music_salon_lib OBJECT ${SOURCES})
+add_library(music_salon_lib OBJECT
+    src/auth/Authentication.cpp
+    src/database/Database.cpp
+    src/models/User.cpp
+)
+
 target_link_libraries(music_salon_lib
     ${SQLITE3_LIBRARIES}
     ${OPENSSL_LIBRARIES}
@@ -110,7 +107,7 @@ if(BUILD_TESTS)
     find_package(GTest REQUIRED)
     include(GoogleTest)
     
-    # Test source files
+    # Existing test source files
     set(TEST_SOURCES
         tests/auth/TestAuthentication.cpp
         tests/database/TestDatabase.cpp
