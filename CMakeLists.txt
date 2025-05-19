@@ -25,6 +25,15 @@ endif()
 find_package(SQLite3 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
+# Make SQLite3 target if it doesn't exist
+if(NOT TARGET SQLite::SQLite3)
+  add_library(SQLite::SQLite3 UNKNOWN IMPORTED)
+  set_target_properties(SQLite::SQLite3 PROPERTIES
+    IMPORTED_LOCATION "${SQLITE3_LIBRARIES}"
+    INTERFACE_INCLUDE_DIRECTORIES "${SQLITE3_INCLUDE_DIRS}"
+  )
+endif()
+
 # Find or fetch nlohmann_json if not found via find_package
 find_package(nlohmann_json QUIET)
 if(NOT nlohmann_json_FOUND)
@@ -49,7 +58,11 @@ set(SOURCES
     src/auth/Authentication.cpp
     src/database/Database.cpp
     src/models/User.cpp
+    src/models/CompactDisc.cpp
+    src/models/MusicalWork.cpp
     src/ui/ConsoleUI.cpp
+    src/ui/ConsoleUI_stubs.cpp
+    src/utils/InputUtils.cpp
     src/main.cpp
 )
 
@@ -73,7 +86,7 @@ add_executable(music_salon ${SOURCES} ${HEADERS})
 
 # Link libraries
 target_link_libraries(music_salon
-    ${SQLITE3_LIBRARIES}
+    SQLite::SQLite3
     ${OPENSSL_LIBRARIES}
     nlohmann_json::nlohmann_json
 )
@@ -94,7 +107,7 @@ add_library(music_salon_lib OBJECT
 )
 
 target_link_libraries(music_salon_lib
-    ${SQLITE3_LIBRARIES}
+    SQLite::SQLite3
     ${OPENSSL_LIBRARIES}
     nlohmann_json::nlohmann_json
 )
@@ -120,7 +133,7 @@ if(BUILD_TESTS)
     # Use modern GTest interface if available
     if(TARGET GTest::gtest AND TARGET GTest::gtest_main)
         target_link_libraries(music_salon_tests
-            ${SQLITE3_LIBRARIES}
+            SQLite::SQLite3
             ${OPENSSL_LIBRARIES}
             nlohmann_json::nlohmann_json
             GTest::gtest
@@ -133,7 +146,7 @@ if(BUILD_TESTS)
     else()
         # Fallback to old-style interface
         target_link_libraries(music_salon_tests
-            ${SQLITE3_LIBRARIES}
+            SQLite::SQLite3
             ${OPENSSL_LIBRARIES}
             nlohmann_json::nlohmann_json
             ${GTEST_LIBRARIES}
