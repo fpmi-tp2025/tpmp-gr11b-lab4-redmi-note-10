@@ -4,6 +4,9 @@
 #include "../../includes/database/Database.h"
 #include "../mock/MockDatabase.h"
 
+using ::testing::Return;
+using ::testing::_;
+
 namespace MusicSalon {
 namespace Tests {
 
@@ -11,7 +14,7 @@ class AuthenticationTest : public ::testing::Test {
 protected:
     void SetUp() override {
         mockDb = std::make_shared<Mocks::MockDatabase>();
-        auth = std::make_unique<Auth::Authentication>(std::dynamic_pointer_cast<Database::Database>(mockDb));
+        auth = std::make_unique<Auth::Authentication>(mockDb);
     }
     
     void TearDown() override {
