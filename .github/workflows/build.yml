@@ -81,7 +81,10 @@ jobs:
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg" install sqlite3:x64-windows openssl:x64-windows gtest:x64-windows nlohmann-json:x64-windows
 
       - name: Create Build Environment
-        run: cmake -E make_directory ${{ github.workspace }}/build
+        run: |
+          cmake -E make_directory ${{ github.workspace }}/build
+          # Очистка кеша, если он существует
+          cmake -E rm -f ${{ github.workspace }}/build/CMakeCache.txt
 
       - name: Configure CMake (Unix)
         if: runner.os != 'Windows'
