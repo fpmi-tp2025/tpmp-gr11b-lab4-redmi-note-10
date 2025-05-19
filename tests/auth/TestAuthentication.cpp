@@ -2,7 +2,7 @@
 #include <memory>
 #include "../../includes/auth/Authentication.h"
 #include "../../includes/database/Database.h"
-#include "../mocks/MockDatabase.h"
+#include "../mock/MockDatabase.h"
 
 using ::testing::Return;
 using ::testing::_;
