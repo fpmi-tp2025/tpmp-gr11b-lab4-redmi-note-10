@@ -1,18 +1,19 @@
 #pragma once
 
+#include <gmock/gmock.h>
 #include "../../includes/database/Database.h"
 
 namespace MusicSalon {
 namespace Mocks {
 
-// Корректная заглушка с наследованием от Database
+// Заглушка с наследованием от Database
 class MockDatabase : public Database::Database {
 public:
     // Используем конструктор базового класса
     MockDatabase() : Database::Database("") {}
     
-    // Переопределяем только нужный метод
-    std::unique_ptr<Models::User> getUserByUsername(const std::string& username) override {
+    // Метод не виртуальный в базовом классе, поэтому не используем override
+    std::unique_ptr<Models::User> getUserByUsername(const std::string& username) {
         if (username == "admin") {
             return std::make_unique<Models::User>(
                 1, "admin", "hash_of_password", "Admin User", "admin@example.com", 
