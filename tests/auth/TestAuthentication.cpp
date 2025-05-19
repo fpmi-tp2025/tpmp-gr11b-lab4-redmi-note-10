@@ -4,9 +4,6 @@
 #include "../../includes/database/Database.h"
 #include "../mock/MockDatabase.h"
 
-using ::testing::Return;
-using ::testing::_;
-
 namespace MusicSalon {
 namespace Tests {
 
