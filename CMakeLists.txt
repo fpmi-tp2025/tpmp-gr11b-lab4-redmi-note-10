@@ -125,8 +125,11 @@ if(BUILD_TESTS)
             nlohmann_json::nlohmann_json
             GTest::gtest
             GTest::gtest_main
-            GTest::gmock
         )
+        # Add GMock only if available
+        if(TARGET GTest::gmock)
+            target_link_libraries(music_salon_tests GTest::gmock)
+        endif()
     else()
         # Fallback to old-style interface
         target_link_libraries(music_salon_tests
