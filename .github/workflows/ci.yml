@@ -1,62 +1,129 @@
-name: CI/CD
+name: Build and Test Music Salon
+
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main ]
-
-permissions:
-  contents: read
-  packages: read
-  actions: read
-  checks: write
-  issues: write
-  pull-requests: write
+    branches: [ main, master, develop ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake g++ libsqlite3-dev libssl-dev
-        sudo apt-get install -y libgtest-dev
-        # Установка nlohmann_json через vcpkg
-        git clone https://github.com/Microsoft/vcpkg.git
-        ./vcpkg/bootstrap-vcpkg.sh
-        ./vcpkg/vcpkg install nlohmann-json
-        
-    - name: Configure CMake
-      run: |
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_CODE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
-        
-    - name: Build
-      run: |
-        cd build
-        make
-        
-    - name: Test
-      run: |
-        cd build
-        ctest -V
-        
-    - name: Generate code coverage report
-      run: |
-        sudo apt-get install -y lcov
-        cd build
-        lcov --capture --directory . --output-file coverage.info
-        lcov --remove coverage.info '/usr/*' --output-file coverage.info
-        lcov --list coverage.info
-        
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./build/coverage.info
-        flags: unittests
-        name: codecov-umbrella
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+            name: "Ubuntu Latest GCC",
+            os: ubuntu-latest,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            generators: "Unix Makefiles"
+          }
+          - {
+            name: "macOS Latest Clang",
+            os: macos-latest,
+            build_type: "Release",
+            cc: "clang",
+            cxx: "clang++",
+            generators: "Unix Makefiles"
+          }
+          - {
+            name: "Windows Latest MSVC",
+            os: windows-latest,
+            build_type: "Release",
+            cc: "cl",
+            cxx: "cl",
+            generators: "Visual Studio 17 2022"
+          }
 
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Environment
+        shell: bash
+        run: |
+          echo "CC=${{ matrix.config.cc }}" >> $GITHUB_ENV
+          echo "CXX=${{ matrix.config.cxx }}" >> $GITHUB_ENV
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libsqlite3-dev libssl-dev libgtest-dev nlohmann-json3-dev
+          cd /usr/src/gtest
+          sudo cmake CMakeLists.txt
+          sudo make
+          sudo cp lib/*.a /usr/lib
+
+      - name: Install macOS Dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cmake sqlite openssl googletest nlohmann-json
+
+      - name: Install Windows Dependencies
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          # Install vcpkg if not already installed
+          if (!(Test-Path "$env:USERPROFILE\vcpkg")) {
+            git clone https://github.com/Microsoft/vcpkg.git "$env:USERPROFILE\vcpkg"
+            cd "$env:USERPROFILE\vcpkg"
+            .\bootstrap-vcpkg.bat
+            .\vcpkg integrate install
+          }
+          
+          # Install required packages
+          & "$env:USERPROFILE\vcpkg\vcpkg" install sqlite3:x64-windows openssl:x64-windows gtest:x64-windows nlohmann-json:x64-windows
+
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{ github.workspace }}/build
+
+      - name: Configure CMake (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        working-directory: ${{ github.workspace }}/build
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -G "${{ matrix.config.generators }}"
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: ${{ github.workspace }}/build
+        run: |
+          cmake $GITHUB_WORKSPACE \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
+            -G "${{ matrix.config.generators }}" \
+            -DCMAKE_TOOLCHAIN_FILE="$env:USERPROFILE\vcpkg\scripts\buildsystems\vcpkg.cmake"
+
+      - name: Build
+        working-directory: ${{ github.workspace }}/build
+        shell: bash
+        run: cmake --build . --config ${{ matrix.config.build_type }}
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/build
+        shell: bash
+        run: ctest -C ${{ matrix.config.build_type }} --output-on-failure
+
+      - name: Package
+        working-directory: ${{ github.workspace }}/build
+        shell: bash
+        run: cpack -C ${{ matrix.config.build_type }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: music-salon-${{ runner.os }}
+          path: |
+            ${{ github.workspace }}/build/music_salon*
+            ${{ github.workspace }}/build/*.deb
+            ${{ github.workspace }}/build/*.dmg
+            ${{ github.workspace }}/build/*.exe
+            ${{ github.workspace }}/build/*.msi
+            ${{ github.workspace }}/build/*.zip
+            ${{ github.workspace }}/resources/
