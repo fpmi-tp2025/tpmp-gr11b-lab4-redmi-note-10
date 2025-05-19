@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.14)
 project(MusicSalon VERSION 1.0.0 LANGUAGES CXX)
 
@@ -9,6 +8,18 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Options
 option(BUILD_TESTS "Build test programs" ON)
+option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
+
+# Add coverage flags if enabled
+if(ENABLE_COVERAGE)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(STATUS "Enabling code coverage")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g --coverage")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+    else()
+        message(WARNING "Code coverage is not supported with this compiler")
+    endif()
+endif()
 
 # Find required packages
 find_package(SQLite3 REQUIRED)
@@ -33,19 +44,12 @@ include_directories(
     ${OPENSSL_INCLUDE_DIR}
 )
 
-# Define source files
+# Define actual source files based on existing files
 set(SOURCES
     src/auth/Authentication.cpp
     src/database/Database.cpp
     src/models/User.cpp
-    src/models/CompactDisc.cpp
-    src/models/Author.cpp
-    src/models/Performer.cpp
-    src/models/MusicalWork.cpp
-    src/models/StockOperation.cpp
     src/ui/ConsoleUI.cpp
-    src/utils/DateUtils.cpp
-    src/utils/InputUtils.cpp
     src/main.cpp
 )
 
@@ -74,8 +78,26 @@ target_link_libraries(music_salon
     nlohmann_json::nlohmann_json
 )
 
-# Copy resources to build directory
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# Copy resources to build directory if the directory exists
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+else()
+    message(STATUS "Resources directory not found, creating empty one")
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/resources)
+endif()
+
+# Create a library from source files for tests to link against
+add_library(music_salon_lib OBJECT
+    src/auth/Authentication.cpp
+    src/database/Database.cpp
+    src/models/User.cpp
+)
+
+target_link_libraries(music_salon_lib
+    ${SQLITE3_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
+    nlohmann_json::nlohmann_json
+)
 
 # Testing
 if(BUILD_TESTS)
@@ -85,7 +107,7 @@ if(BUILD_TESTS)
     find_package(GTest REQUIRED)
     include(GoogleTest)
     
-    # Test source files
+    # Existing test source files
     set(TEST_SOURCES
         tests/auth/TestAuthentication.cpp
         tests/database/TestDatabase.cpp
@@ -93,7 +115,7 @@ if(BUILD_TESTS)
     )
     
     # Create test executable
-    add_executable(music_salon_tests ${TEST_SOURCES})
+    add_executable(music_salon_tests ${TEST_SOURCES} $<TARGET_OBJECTS:music_salon_lib>)
     
     # Use modern GTest interface if available
     if(TARGET GTest::gtest AND TARGET GTest::gtest_main)
@@ -103,8 +125,11 @@ if(BUILD_TESTS)
             nlohmann_json::nlohmann_json
             GTest::gtest
             GTest::gtest_main
-            GTest::gmock
         )
+        # Add GMock only if available
+        if(TARGET GTest::gmock)
+            target_link_libraries(music_salon_tests GTest::gmock)
+        endif()
     else()
         # Fallback to old-style interface
         target_link_libraries(music_salon_tests
@@ -123,7 +148,16 @@ endif()
 
 # Packaging
 include(InstallRequiredSystemLibraries)
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+# Check if LICENSE file exists, otherwise create a default one
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    message(STATUS "LICENSE file not found, creating default one")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE" "This software is provided as-is, without any express or implied warranty.\n")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE")
+else()
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+endif()
+
 set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
@@ -141,4 +175,8 @@ include(CPack)
 
 # Install targets
 install(TARGETS music_salon DESTINATION bin)
-install(DIRECTORY resources/ DESTINATION share/music_salon/resources)
+
+# Install resources if they exist
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+    install(DIRECTORY resources/ DESTINATION share/music_salon/resources)
+endif()
