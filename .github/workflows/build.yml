@@ -55,10 +55,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential libsqlite3-dev libssl-dev libgtest-dev nlohmann-json3-dev lcov
-          cd /usr/src/gtest
-          sudo cmake CMakeLists.txt
+          
+          # Build and install Google Test & Google Mock manually
+          cd /usr/src/googletest
+          sudo cmake .
           sudo make
           sudo cp lib/*.a /usr/lib
+          sudo cp -r googletest/include/gtest /usr/include/
+          sudo cp -r googlemock/include/gmock /usr/include/
 
       - name: Install macOS Dependencies
         if: runner.os == 'macOS'
