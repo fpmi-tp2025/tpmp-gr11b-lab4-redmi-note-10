@@ -1,453 +1,129 @@
-name: CI/CD
+name: Build and Test Music Salon
+
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main ]
-
-permissions:
-  contents: read
-  packages: read
-  actions: read
-  checks: write
-  issues: write
-  pull-requests: write
+    branches: [ main, master, develop ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+            name: "Ubuntu Latest GCC",
+            os: ubuntu-latest,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            generators: "Unix Makefiles"
+          }
+          - {
+            name: "macOS Latest Clang",
+            os: macos-latest,
+            build_type: "Release",
+            cc: "clang",
+            cxx: "clang++",
+            generators: "Unix Makefiles"
+          }
+          - {
+            name: "Windows Latest MSVC",
+            os: windows-latest,
+            build_type: "Release",
+            cc: "cl",
+            cxx: "cl",
+            generators: "Visual Studio 17 2022"
+          }
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake g++ libsqlite3-dev libssl-dev
-        sudo apt-get install -y libgtest-dev
-        # Установка nlohmann_json через vcpkg
-        git clone https://github.com/Microsoft/vcpkg.git
-        ./vcpkg/bootstrap-vcpkg.sh
-        ./vcpkg/vcpkg install nlohmann-json
-        
-    - name: Configure CMake
-      run: |
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_CODE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
-        
-    - name: Build
-      run: |
-        cd build
-        make
-        
-    - name: Test
-      run: |
-        cd build
-        ctest -V
-        
-    - name: Generate code coverage report
-      run: |
-        sudo apt-get install -y lcov
-        cd build
-        lcov --capture --directory . --output-file coverage.info
-        lcov --remove coverage.info '/usr/*' --output-file coverage.info
-        lcov --list coverage.info
-        
-    - name: Create missing implementation files
-      run: |
-        # Создание директорий для файлов реализации
-        mkdir -p src/models src/utils
-        
-        # Реализация CompactDisc.cpp
-        cat > src/models/CompactDisc.cpp << 'EOL'
-        #include "../../includes/models/CompactDisc.h"
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-        namespace MusicSalon {
-        namespace Models {
+      - name: Setup Environment
+        shell: bash
+        run: |
+          echo "CC=${{ matrix.config.cc }}" >> $GITHUB_ENV
+          echo "CXX=${{ matrix.config.cxx }}" >> $GITHUB_ENV
 
-        CompactDisc::CompactDisc(int discCode, const std::string& title, const std::string& manufactureDate,
-                            const std::string& producer, double price, const std::string& createDate,
-                            const std::string& lastUpdate, int createdBy)
-            : discCode(discCode), title(title), manufactureDate(manufactureDate),
-              producer(producer), price(price), createDate(createDate),
-              lastUpdate(lastUpdate), createdBy(createdBy) {
-        }
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libsqlite3-dev libssl-dev libgtest-dev nlohmann-json3-dev
+          cd /usr/src/gtest
+          sudo cmake CMakeLists.txt
+          sudo make
+          sudo cp lib/*.a /usr/lib
 
-        CompactDisc::CompactDisc(const std::string& title, const std::string& manufactureDate,
-                            const std::string& producer, double price)
-            : discCode(-1), title(title), manufactureDate(manufactureDate),
-              producer(producer), price(price), createDate(""), lastUpdate(""), createdBy(-1) {
-        }
+      - name: Install macOS Dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cmake sqlite openssl googletest nlohmann-json
 
-        int CompactDisc::getDiscCode() const { return discCode; }
-        std::string CompactDisc::getTitle() const { return title; }
-        std::string CompactDisc::getManufactureDate() const { return manufactureDate; }
-        std::string CompactDisc::getProducer() const { return producer; }
-        double CompactDisc::getPrice() const { return price; }
-        std::string CompactDisc::getCreateDate() const { return createDate; }
-        std::string CompactDisc::getLastUpdate() const { return lastUpdate; }
-        int CompactDisc::getCreatedBy() const { return createdBy; }
+      - name: Install Windows Dependencies
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          # Install vcpkg if not already installed
+          if (!(Test-Path "$env:USERPROFILE\vcpkg")) {
+            git clone https://github.com/Microsoft/vcpkg.git "$env:USERPROFILE\vcpkg"
+            cd "$env:USERPROFILE\vcpkg"
+            .\bootstrap-vcpkg.bat
+            .\vcpkg integrate install
+          }
+          
+          # Install required packages
+          & "$env:USERPROFILE\vcpkg\vcpkg" install sqlite3:x64-windows openssl:x64-windows gtest:x64-windows nlohmann-json:x64-windows
 
-        void CompactDisc::setTitle(const std::string& title) { this->title = title; }
-        void CompactDisc::setManufactureDate(const std::string& manufactureDate) { this->manufactureDate = manufactureDate; }
-        void CompactDisc::setProducer(const std::string& producer) { this->producer = producer; }
-        void CompactDisc::setPrice(double price) { this->price = price; }
-        void CompactDisc::setLastUpdate(const std::string& lastUpdate) { this->lastUpdate = lastUpdate; }
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{ github.workspace }}/build
 
-        } // namespace Models
-        } // namespace MusicSalon
-        EOL
-        
-        # Реализация MusicalWork.cpp
-        cat > src/models/MusicalWork.cpp << 'EOL'
-        #include "../../includes/models/MusicalWork.h"
+      - name: Configure CMake (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        working-directory: ${{ github.workspace }}/build
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -G "${{ matrix.config.generators }}"
 
-        namespace MusicSalon {
-        namespace Models {
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: ${{ github.workspace }}/build
+        run: |
+          cmake $GITHUB_WORKSPACE \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
+            -G "${{ matrix.config.generators }}" \
+            -DCMAKE_TOOLCHAIN_FILE="$env:USERPROFILE\vcpkg\scripts\buildsystems\vcpkg.cmake"
 
-        MusicalWork::MusicalWork(int workId, const std::string& title, int authorId, int performerId,
-                            int discCode, int trackNumber, int duration, const std::string& createDate,
-                            const std::string& lastUpdate, int createdBy)
-            : workId(workId), title(title), authorId(authorId), performerId(performerId),
-              discCode(discCode), trackNumber(trackNumber), duration(duration),
-              createDate(createDate), lastUpdate(lastUpdate), createdBy(createdBy) {
-        }
+      - name: Build
+        working-directory: ${{ github.workspace }}/build
+        shell: bash
+        run: cmake --build . --config ${{ matrix.config.build_type }}
 
-        MusicalWork::MusicalWork(const std::string& title, int authorId, int performerId,
-                            int discCode, int trackNumber, int duration)
-            : workId(-1), title(title), authorId(authorId), performerId(performerId),
-              discCode(discCode), trackNumber(trackNumber), duration(duration),
-              createDate(""), lastUpdate(""), createdBy(-1) {
-        }
+      - name: Test
+        working-directory: ${{ github.workspace }}/build
+        shell: bash
+        run: ctest -C ${{ matrix.config.build_type }} --output-on-failure
 
-        int MusicalWork::getWorkId() const { return workId; }
-        std::string MusicalWork::getTitle() const { return title; }
-        int MusicalWork::getAuthorId() const { return authorId; }
-        int MusicalWork::getPerformerId() const { return performerId; }
-        int MusicalWork::getDiscCode() const { return discCode; }
-        int MusicalWork::getTrackNumber() const { return trackNumber; }
-        int MusicalWork::getDuration() const { return duration; }
-        std::string MusicalWork::getCreateDate() const { return createDate; }
-        std::string MusicalWork::getLastUpdate() const { return lastUpdate; }
-        int MusicalWork::getCreatedBy() const { return createdBy; }
+      - name: Package
+        working-directory: ${{ github.workspace }}/build
+        shell: bash
+        run: cpack -C ${{ matrix.config.build_type }}
 
-        void MusicalWork::setTitle(const std::string& title) { this->title = title; }
-        void MusicalWork::setAuthorId(int authorId) { this->authorId = authorId; }
-        void MusicalWork::setPerformerId(int performerId) { this->performerId = performerId; }
-        void MusicalWork::setDiscCode(int discCode) { this->discCode = discCode; }
-        void MusicalWork::setTrackNumber(int trackNumber) { this->trackNumber = trackNumber; }
-        void MusicalWork::setDuration(int duration) { this->duration = duration; }
-        void MusicalWork::setLastUpdate(const std::string& lastUpdate) { this->lastUpdate = lastUpdate; }
-
-        } // namespace Models
-        } // namespace MusicSalon
-        EOL
-        
-        # Реализация InputUtils.cpp
-        cat > src/utils/InputUtils.cpp << 'EOL'
-        #include "../../includes/utils/InputUtils.h"
-        #include <iostream>
-        #include <limits>
-
-        namespace MusicSalon {
-        namespace Utils {
-
-        std::string InputUtils::getStringInput(const std::string& prompt, bool allowEmpty) {
-            std::string input;
-            bool valid = false;
-            
-            while (!valid) {
-                std::cout << prompt;
-                std::getline(std::cin, input);
-                
-                if (allowEmpty || !input.empty()) {
-                    valid = true;
-                } else {
-                    std::cout << "Ошибка: Пустой ввод не допускается." << std::endl;
-                }
-            }
-            
-            return input;
-        }
-
-        int InputUtils::getIntInput(const std::string& prompt, int min, int max) {
-            int input;
-            bool valid = false;
-            
-            while (!valid) {
-                std::cout << prompt;
-                if (std::cin >> input) {
-                    if (input >= min && input <= max) {
-                        valid = true;
-                    } else {
-                        std::cout << "Ошибка: Введите число от " << min << " до " << max << "." << std::endl;
-                    }
-                } else {
-                    std::cin.clear();
-                    std::cout << "Ошибка: Введите целое число." << std::endl;
-                }
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            }
-            
-            return input;
-        }
-
-        double InputUtils::getDoubleInput(const std::string& prompt, double min, double max) {
-            double input;
-            bool valid = false;
-            
-            while (!valid) {
-                std::cout << prompt;
-                if (std::cin >> input) {
-                    if (input >= min && input <= max) {
-                        valid = true;
-                    } else {
-                        std::cout << "Ошибка: Введите число от " << min << " до " << max << "." << std::endl;
-                    }
-                } else {
-                    std::cin.clear();
-                    std::cout << "Ошибка: Введите вещественное число." << std::endl;
-                }
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            }
-            
-            return input;
-        }
-
-        std::string InputUtils::getPasswordInput(const std::string& prompt) {
-            // В консольном приложении просто запрашиваем пароль без маскировки
-            return getStringInput(prompt);
-        }
-
-        std::string InputUtils::getDateInput(const std::string& prompt) {
-            std::string input;
-            bool valid = false;
-            
-            while (!valid) {
-                input = getStringInput(prompt);
-                
-                // Проверка формата YYYY-MM-DD
-                if (input.length() == 10 && input[4] == '-' && input[7] == '-') {
-                    valid = true;
-                } else {
-                    std::cout << "Ошибка: Введите дату в формате YYYY-MM-DD." << std::endl;
-                }
-            }
-            
-            return input;
-        }
-
-        int InputUtils::getChoice(const std::string& prompt, const std::vector<std::string>& options) {
-            std::cout << prompt << std::endl;
-            
-            for (size_t i = 0; i < options.size(); i++) {
-                std::cout << (i + 1) << ". " << options[i] << std::endl;
-            }
-            
-            return getIntInput("Выберите (1-" + std::to_string(options.size()) + "): ", 1, options.size()) - 1;
-        }
-
-        bool InputUtils::confirm(const std::string& prompt) {
-            std::string input;
-            bool valid = false;
-            bool result = false;
-            
-            while (!valid) {
-                input = getStringInput(prompt + " (д/н): ");
-                
-                if (input == "д" || input == "Д" || input == "y" || input == "Y" || input == "yes" || input == "да") {
-                    result = true;
-                    valid = true;
-                } else if (input == "н" || input == "Н" || input == "n" || input == "N" || input == "no" || input == "нет") {
-                    result = false;
-                    valid = true;
-                } else {
-                    std::cout << "Ошибка: Введите 'д' или 'н'." << std::endl;
-                }
-            }
-            
-            return result;
-        }
-
-        } // namespace Utils
-        } // namespace MusicSalon
-        EOL
-        
-        # Реализация DateUtils.cpp
-        cat > src/utils/DateUtils.cpp << 'EOL'
-        #include "../../includes/utils/DateUtils.h"
-        #include <ctime>
-        #include <iomanip>
-        #include <sstream>
-
-        namespace MusicSalon {
-        namespace Utils {
-
-        std::string DateUtils::getCurrentDate() {
-            auto now = std::chrono::system_clock::now();
-            return formatDate(now);
-        }
-
-        std::string DateUtils::getCurrentDateTime() {
-            auto now = std::chrono::system_clock::now();
-            auto time = std::chrono::system_clock::to_time_t(now);
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-            return ss.str();
-        }
-
-        bool DateUtils::isValidDate(const std::string& date) {
-            // Проверка формата YYYY-MM-DD
-            if (date.length() != 10 || date[4] != '-' || date[7] != '-') {
-                return false;
-            }
-            
-            try {
-                int year = std::stoi(date.substr(0, 4));
-                int month = std::stoi(date.substr(5, 2));
-                int day = std::stoi(date.substr(8, 2));
-                
-                // Проверка диапазонов
-                if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
-                    return false;
-                }
-                
-                // Дополнительные проверки для февраля и других месяцев
-                if (month == 2) {
-                    bool leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-                    if (day > (leap ? 29 : 28)) {
-                        return false;
-                    }
-                } else if (month == 4 || month == 6 || month == 9 || month == 11) {
-                    if (day > 30) {
-                        return false;
-                    }
-                }
-            } catch (...) {
-                return false;
-            }
-            
-            return true;
-        }
-
-        std::string DateUtils::formatDate(const std::chrono::system_clock::time_point& timePoint) {
-            auto time = std::chrono::system_clock::to_time_t(timePoint);
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&time), "%Y-%m-%d");
-            return ss.str();
-        }
-
-        int DateUtils::getDaysDifference(const std::string& date1, const std::string& date2) {
-            // Заглушка для простоты - просто разница между днями
-            try {
-                int day1 = std::stoi(date1.substr(8, 2));
-                int month1 = std::stoi(date1.substr(5, 2));
-                int year1 = std::stoi(date1.substr(0, 4));
-                
-                int day2 = std::stoi(date2.substr(8, 2));
-                int month2 = std::stoi(date2.substr(5, 2));
-                int year2 = std::stoi(date2.substr(0, 4));
-                
-                // Очень приблизительный расчет
-                return (year2 - year1) * 365 + (month2 - month1) * 30 + (day2 - day1);
-            } catch (...) {
-                return 0;
-            }
-        }
-
-        std::string DateUtils::addDays(const std::string& date, int days) {
-            // Заглушка - просто добавляем дни без учета месяцев и лет
-            try {
-                int day = std::stoi(date.substr(8, 2));
-                int month = std::stoi(date.substr(5, 2));
-                int year = std::stoi(date.substr(0, 4));
-                
-                day += days;
-                
-                // Упрощенная логика
-                while (day > 30) {
-                    day -= 30;
-                    month++;
-                    if (month > 12) {
-                        month = 1;
-                        year++;
-                    }
-                }
-                
-                std::stringstream ss;
-                ss << year << "-" << std::setw(2) << std::setfill('0') << month 
-                  << "-" << std::setw(2) << std::setfill('0') << day;
-                return ss.str();
-            } catch (...) {
-                return date;
-            }
-        }
-
-        int DateUtils::compareDates(const std::string& date1, const std::string& date2) {
-            int diff = getDaysDifference(date1, date2);
-            
-            if (diff < 0) return 1;
-            if (diff > 0) return -1;
-            return 0;
-        }
-
-        } // namespace Utils
-        } // namespace MusicSalon
-        EOL
-        
-        # Создание заглушек для методов ConsoleUI
-        cat > src/ui/ConsoleUI_stubs.cpp << 'EOL'
-        #include "../../includes/ui/ConsoleUI.h"
-        #include <iostream>
-
-        namespace MusicSalon {
-        namespace UI {
-
-        void ConsoleUI::manageCompactDiscs() {
-            std::cout << "Метод manageCompactDiscs временно не реализован" << std::endl;
-        }
-
-        void ConsoleUI::manageAuthors() {
-            std::cout << "Метод manageAuthors временно не реализован" << std::endl;
-        }
-
-        void ConsoleUI::managePerformers() {
-            std::cout << "Метод managePerformers временно не реализован" << std::endl;
-        }
-
-        void ConsoleUI::manageMusicalWorks() {
-            std::cout << "Метод manageMusicalWorks временно не реализован" << std::endl;
-        }
-
-        void ConsoleUI::manageStockOperations() {
-            std::cout << "Метод manageStockOperations временно не реализован" << std::endl;
-        }
-
-        void ConsoleUI::viewReports() {
-            std::cout << "Метод viewReports временно не реализован" << std::endl;
-        }
-
-        void ConsoleUI::viewPopularPerformers() {
-            std::cout << "Метод viewPopularPerformers временно не реализован" << std::endl;
-        }
-
-        void ConsoleUI::displayMusicalWork(const Models::MusicalWork& work) {
-            std::cout << "  Произведение: " << work.getTitle() << std::endl;
-        }
-
-        } // namespace UI
-        } // namespace MusicSalon
-        EOL
-        
-        # Убедимся, что файлы созданы
-        ls -la src/models/
-        ls -la src/utils/
-        ls -la src/ui/
-
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./build/coverage.info
-        flags: unittests
-        name: codecov-umbrella
-
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: music-salon-${{ runner.os }}
+          path: |
+            ${{ github.workspace }}/build/music_salon*
+            ${{ github.workspace }}/build/*.deb
+            ${{ github.workspace }}/build/*.dmg
+            ${{ github.workspace }}/build/*.exe
+            ${{ github.workspace }}/build/*.msi
+            ${{ github.workspace }}/build/*.zip
+            ${{ github.workspace }}/resources/
