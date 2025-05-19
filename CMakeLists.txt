@@ -57,6 +57,7 @@ include_directories(
 set(SOURCES
     src/auth/Authentication.cpp
     src/database/Database.cpp
+    src/database/Database_stubs.cpp
     src/models/User.cpp
     src/models/CompactDisc.cpp
     src/models/MusicalWork.cpp
@@ -103,7 +104,11 @@ endif()
 add_library(music_salon_lib OBJECT
     src/auth/Authentication.cpp
     src/database/Database.cpp
+    src/database/Database_stubs.cpp
     src/models/User.cpp
+    src/models/CompactDisc.cpp
+    src/models/MusicalWork.cpp
+    src/utils/InputUtils.cpp
 )
 
 target_link_libraries(music_salon_lib
