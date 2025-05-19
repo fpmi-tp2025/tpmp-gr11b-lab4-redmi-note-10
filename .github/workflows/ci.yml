@@ -54,7 +54,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libsqlite3-dev libssl-dev libgtest-dev nlohmann-json3-dev
+          sudo apt-get install -y cmake build-essential libsqlite3-dev libssl-dev libgtest-dev nlohmann-json3-dev lcov
           cd /usr/src/gtest
           sudo cmake CMakeLists.txt
           sudo make
@@ -64,22 +64,17 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install cmake sqlite openssl googletest nlohmann-json
+          brew install cmake sqlite openssl googletest nlohmann-json lcov
 
       - name: Install Windows Dependencies
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          # Install vcpkg if not already installed
-          if (!(Test-Path "$env:USERPROFILE\vcpkg")) {
-            git clone https://github.com/Microsoft/vcpkg.git "$env:USERPROFILE\vcpkg"
-            cd "$env:USERPROFILE\vcpkg"
-            .\bootstrap-vcpkg.bat
-            .\vcpkg integrate install
-          }
+          # Use the pre-installed vcpkg on GitHub runners
+          Write-Host "Using vcpkg at $env:VCPKG_INSTALLATION_ROOT"
           
           # Install required packages
-          & "$env:USERPROFILE\vcpkg\vcpkg" install sqlite3:x64-windows openssl:x64-windows gtest:x64-windows nlohmann-json:x64-windows
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg" install sqlite3:x64-windows openssl:x64-windows gtest:x64-windows nlohmann-json:x64-windows
 
       - name: Create Build Environment
         run: cmake -E make_directory ${{ github.workspace }}/build
@@ -88,7 +83,7 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         working-directory: ${{ github.workspace }}/build
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -G "${{ matrix.config.generators }}"
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} -G "${{ matrix.config.generators }}" -DENABLE_COVERAGE=${{ runner.os == 'Linux' }}
 
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
@@ -98,7 +93,7 @@ jobs:
           cmake $GITHUB_WORKSPACE \
             -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
             -G "${{ matrix.config.generators }}" \
-            -DCMAKE_TOOLCHAIN_FILE="$env:USERPROFILE\vcpkg\scripts\buildsystems\vcpkg.cmake"
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         working-directory: ${{ github.workspace }}/build
@@ -109,6 +104,37 @@ jobs:
         working-directory: ${{ github.workspace }}/build
         shell: bash
         run: ctest -C ${{ matrix.config.build_type }} --output-on-failure
+
+      - name: Generate Coverage Report
+        if: runner.os == 'Linux'
+        working-directory: ${{ github.workspace }}
+        run: |
+          lcov --capture --directory ${{ github.workspace }}/build --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' --output-file coverage.info
+          lcov --list coverage.info
+          
+          # Generate HTML report
+          mkdir -p coverage-report
+          genhtml coverage.info --output-directory coverage-report
+          echo "Coverage report generated in coverage-report directory"
+
+      - name: Upload Coverage Report to Codecov
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Upload Coverage HTML Report
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-report/
 
       - name: Package
         working-directory: ${{ github.workspace }}/build
