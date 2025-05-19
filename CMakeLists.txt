@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.14)
 project(MusicSalon VERSION 1.0.0 LANGUAGES CXX)
 
@@ -9,6 +8,18 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Options
 option(BUILD_TESTS "Build test programs" ON)
+option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
+
+# Add coverage flags if enabled
+if(ENABLE_COVERAGE)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(STATUS "Enabling code coverage")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g --coverage")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+    else()
+        message(WARNING "Code coverage is not supported with this compiler")
+    endif()
+endif()
 
 # Find required packages
 find_package(SQLite3 REQUIRED)
@@ -77,6 +88,14 @@ target_link_libraries(music_salon
 # Copy resources to build directory
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
+# Create a library from source files for tests to link against
+add_library(music_salon_lib OBJECT ${SOURCES})
+target_link_libraries(music_salon_lib
+    ${SQLITE3_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
+    nlohmann_json::nlohmann_json
+)
+
 # Testing
 if(BUILD_TESTS)
     enable_testing()
@@ -93,7 +112,7 @@ if(BUILD_TESTS)
     )
     
     # Create test executable
-    add_executable(music_salon_tests ${TEST_SOURCES})
+    add_executable(music_salon_tests ${TEST_SOURCES} $<TARGET_OBJECTS:music_salon_lib>)
     
     # Use modern GTest interface if available
     if(TARGET GTest::gtest AND TARGET GTest::gtest_main)
