@@ -85,8 +85,13 @@ target_link_libraries(music_salon
     nlohmann_json::nlohmann_json
 )
 
-# Copy resources to build directory
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# Copy resources to build directory if the directory exists
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+else()
+    message(STATUS "Resources directory not found, creating empty one")
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/resources)
+endif()
 
 # Create a library from source files for tests to link against
 add_library(music_salon_lib OBJECT ${SOURCES})
@@ -142,7 +147,16 @@ endif()
 
 # Packaging
 include(InstallRequiredSystemLibraries)
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+# Check if LICENSE file exists, otherwise create a default one
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    message(STATUS "LICENSE file not found, creating default one")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE" "This software is provided as-is, without any express or implied warranty.\n")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE")
+else()
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+endif()
+
 set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
@@ -160,4 +174,7 @@ include(CPack)
 
 # Install targets
 install(TARGETS music_salon DESTINATION bin)
-install(DIRECTORY resources/ DESTINATION share/music_salon/resources)
+
+# Install resources if they exist
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+    install(DIRECTORY resources/ DESTINATION share/music_salon/resources)
