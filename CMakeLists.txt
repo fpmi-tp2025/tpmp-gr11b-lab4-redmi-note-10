@@ -49,6 +49,7 @@ endif()
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests  # Добавлено для поиска mock-объектов
     ${SQLITE3_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
 )
@@ -61,6 +62,9 @@ set(SOURCES
     src/models/User.cpp
     src/models/CompactDisc.cpp
     src/models/MusicalWork.cpp
+    src/models/Author.cpp
+    src/models/Performer.cpp
+    src/models/StockOperation.cpp
     src/ui/ConsoleUI.cpp
     src/ui/ConsoleUI_stubs.cpp
     src/utils/InputUtils.cpp
@@ -108,6 +112,9 @@ add_library(music_salon_lib OBJECT
     src/models/User.cpp
     src/models/CompactDisc.cpp
     src/models/MusicalWork.cpp
+    src/models/Author.cpp
+    src/models/Performer.cpp
+    src/models/StockOperation.cpp
     src/utils/InputUtils.cpp
 )
 
