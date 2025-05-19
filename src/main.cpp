@@ -1,26 +1,27 @@
+#include "../include/MusicStoreDB.h"
+#include "../include/UserInterface.h"
 #include <iostream>
 #include <memory>
-#include "../includes/auth/Authentication.h"
-#include "../includes/database/Database.h"
-#include "../includes/ui/ConsoleUI.h"
 
-int main(int argc, char* argv[]) {
-    std::string dbPath = "music_salon.db";
+int main() {
+    // Установка русской локали для корректного отображения кириллицы
+    std::setlocale(LC_ALL, "Russian");
     
-    if (argc > 1) {
-        dbPath = argv[1];
+    std::cout << "=== Музыкальный салон - Консольное приложение ===" << std::endl;
+    
+    try {
+        // Создание объекта базы данных
+        std::shared_ptr<MusicStoreDB> db = std::make_shared<MusicStoreDB>("music_store.db");
+        
+        // Создание и запуск пользовательского интерфейса
+        UserInterface ui(db); // false - изначально не администратор
+        ui.run();
+    } catch (const std::exception& e) {
+        std::cerr << "Ошибка: " << e.what() << std::endl;
+        return 1;
     }
     
-    std::cout << "=== Музыкальный салон: Система управления ===" << std::endl;
-    std::cout << "Версия: 1.0.0" << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
-    
-    std::cout << "Подключение к базе данных: " << dbPath << std::endl;
-    auto db = std::make_shared<MusicSalon::Database::Database>(dbPath);
-    auto auth = std::make_shared<MusicSalon::Auth::Authentication>(db);
-    
-    MusicSalon::UI::ConsoleUI ui(auth, db);
-    ui.run();
+    std::cout << "Программа завершена." << std::endl;
     
     return 0;
 }
