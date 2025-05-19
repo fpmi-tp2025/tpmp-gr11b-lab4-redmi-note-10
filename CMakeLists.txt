@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.14)
 project(MusicSalon VERSION 1.0.0 LANGUAGES CXX)
 
@@ -178,3 +179,4 @@ install(TARGETS music_salon DESTINATION bin)
 # Install resources if they exist
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     install(DIRECTORY resources/ DESTINATION share/music_salon/resources)
+endif()
